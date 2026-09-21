@@ -126,7 +126,10 @@ public class IngestionServiceApp {
     }
 
     private static Ward cleanRow(String[] record) {
-        if (record.length < 4) return null;
+        if (record.length < 4) {
+            System.err.println("Skipping incomplete row: " + String.join(",", record));
+            return null;
+        }
 
         String normalizedWardId = normalizeWardId(record[0]);
         String normalizedWing = normalizeWing(record[1]);
@@ -135,8 +138,18 @@ public class IngestionServiceApp {
         String notes = null;
 
         // Flag data quality issues
-        if (beds == null && !isMissingValue(record[3]) && !record[3].trim().isEmpty()) {
-            notes = "bedsAvailable was non-numeric ('" + record[3].trim() + "') - flagged for follow-up";
+        String rawBeds = record[3].trim();
+        if (beds == null && !isMissingValue(record[rawBeds]) && !rawBeds.trim().isEmpty()) {
+            notes = "bedsAvailable was non-numeric ('" + rawBeds + "' (expected non-negative integer)";
+        }
+
+        // Flag missing wing
+        if (normalizedWing == null) {
+            if (notes != null) {
+                notes += "; wing missing";
+            } else {
+                notes = "wing missing"
+            }
         }
         return new Ward(normalizedWardId, normalizedWing, normalizedDept, beds, notes);
     }
@@ -224,6 +237,7 @@ public class IngestionServiceApp {
                 lower.equals("tbd") ||
                 lower.equals("unknown") ||
                 lower.equals("-") ||
-                lower.equals("nan");
+                lower.equals("nan") ||
+                lower.equals("none");
     }
 }
