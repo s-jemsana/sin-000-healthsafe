@@ -34,39 +34,55 @@ public class WardServiceApp {
 
         app.get("/health", ctx -> ctx.result("OK"));
 
-        // GET /wards{id} - return single ward or 404
+        // GET /wards/{id} - return single ward or 404
         app.get("/wards/{id}", ctx -> {
-            String wardId = ctx.pathParam("id").trim().toUpperCase();
+            try {
+                String wardId = ctx.pathParam("id").trim().toUpperCase();
 
-            Ward ward = fetchWardsFromIngestion().stream()
-                    .filter(w -> w.wardId != null && w.wardId.equalsIgnoreCase(wardId))
-                    .findFirst()
-                    .orElse(null);
+                Ward ward = fetchWardsFromIngestion().stream()
+                        .filter(w -> w.wardId != null && w.wardId.equalsIgnoreCase(wardId))
+                        .findFirst()
+                        .orElse(null);
 
-            if (ward == null) {
-                ctx.status(404);
-                ctx.json(new ErrorResponse("Ward not found: " + wardId));
-                return;
+                if (ward == null) {
+                    ctx.status(404);
+                    ctx.json(new ErrorResponse("Ward not found: " + wardId));
+                    return;
+                }
+
+                ctx.json(ward);
+            } catch (RuntimeException e) {
+                ctx.status(503);
+                ctx.json(new ErrorResponse("ingestion-service unavailable"));
             }
 
-            ctx.json(ward);
         });
 
         // GET /wards - return all wards
         app.get("/wards", ctx -> {
-            ctx.json(fetchWardsFromIngestion());
+            try{
+                ctx.json(fetchWardsFromIngestion());
+            } catch (RuntimeException e) {
+                ctx.status(503);
+                ctx.json(new ErrorResponse("ingestion-service unavailable"));
+            }
         });
 
         // GET /departments - return unique department names
         app.get("/departments", ctx -> {
-            List<String> departments = fetchWardsFromIngestion().stream()
-                    .map(w -> w.department)
-                    .filter(d -> d != null && !d.isBlank())
-                    .distinct()
-                    .sorted()
-                    .toList();
+            try {
+                List<String> departments = fetchWardsFromIngestion().stream()
+                        .map(w -> w.department)
+                        .filter(d -> d != null && !d.isBlank())
+                        .distinct()
+                        .sorted()
+                        .toList();
 
-            ctx.json(departments);
+                ctx.json(departments);
+            } catch (RuntimeException e) {
+                ctx.status(503);
+                ctx.json(new ErrorResponse("ingestion-service unavailable"));
+            }
         });
     }
 
@@ -89,12 +105,12 @@ public class WardServiceApp {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                System.err.println("Failed to fetch wards from ingestion-service: " + response.statusCode());
-                return new ArrayList<>();
+               throw new RuntimeException("ingestion-service returned HTTP " + response.statusCode());
             }
 
             ObjectMapper mapper = new ObjectMapper();
             Ward[] wardArray = mapper.readValue(response.body(), Ward[].class);
+
             List<Ward> wardList = new ArrayList<>();
             for (Ward ward : wardArray) {
                 wardList.add(ward);
@@ -103,9 +119,7 @@ public class WardServiceApp {
             System.out.println("Loaded " + wardList.size() + " wards from ingestion-service");
             return wardList;
         } catch (Exception e) {
-            System.err.println("Error fetching wards from ingestions-service: " + e.getMessage());
-            e.printStackTrace();
-            return new ArrayList<>();
+            throw new RuntimeException("Could not fetch wards from ingestion-service", e);
         }
     }
 }
