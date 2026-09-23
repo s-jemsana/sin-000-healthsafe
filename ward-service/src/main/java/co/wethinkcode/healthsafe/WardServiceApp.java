@@ -34,13 +34,48 @@ public class WardServiceApp {
 
         app.get("/health", ctx -> ctx.result("OK"));
 
-        // Fetch and cache wards from ingestion-service on startup
-        List<Ward> wards = fetchWardsFromIngestion();
+        // GET /wards{id} - return single ward or 404
+        app.get("/wards/{id}", ctx -> {
+            String wardId = ctx.pathParam("id").trim().toUpperCase();
+
+            Ward ward = fetchWardsFromIngestion().stream()
+                    .filter(w -> w.wardId != null && w.wardId.equalsIgnoreCase(wardId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (ward == null) {
+                ctx.status(404);
+                ctx.json(new ErrorResponse("Ward not found: " + wardId));
+                return;
+            }
+
+            ctx.json(ward);
+        });
 
         // GET /wards - return all wards
         app.get("/wards", ctx -> {
             ctx.json(fetchWardsFromIngestion());
         });
+
+        // GET /departments - return unique department names
+        app.get("/departments", ctx -> {
+            List<String> departments = fetchWardsFromIngestion().stream()
+                    .map(w -> w.department)
+                    .filter(d -> d != null && !d.isBlank())
+                    .distinct()
+                    .sorted()
+                    .toList();
+
+            ctx.json(departments);
+        });
+    }
+
+    public static class ErrorResponse {
+        public String message;
+
+        public ErrorResponse(String message) {
+            this.message = message;
+        }
     }
 
     private static List<Ward> fetchWardsFromIngestion() {
