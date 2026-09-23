@@ -60,8 +60,23 @@ public class StaffingServiceApp {
 
         app.get("/health", ctx -> ctx.result("OK"));
 
-        // TODO (Provides on-call schedules for doctors based on ward and status.)
-        // Add domain endpoints for staffing-service here.
+        // GET /staffing/{wardId} - return on-call schedule for a ward
+        app.get("/staffing/{wardId}", ctx -> {
+            String wardId = ctx.pathParam("wardId").trim().toUpperCase();
+
+            try {
+                Ward ward = fetchWard(wardId);
+                AlertLevel alertLevel = fetchAlertLevel();
+
+                ctx.json(buildSchedule(ward, alertLevel.level));
+            } catch (WardNotFoundException e) {
+                ctx.status(404);
+                ctx.json(new ErrorResponse("Ward not found: " + wardId));
+            } catch (DownstreamServiceException e) {
+                ctx.status(503);
+                ctx.json(new ErrorResponse(e.getMessage()));
+            }
+        });
     }
 
     private static Ward fetchWard(String wardId) {
