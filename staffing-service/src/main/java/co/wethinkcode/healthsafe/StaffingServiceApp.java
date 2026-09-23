@@ -4,6 +4,7 @@ import io.javalin.Javalin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -107,6 +108,39 @@ public class StaffingServiceApp {
         } catch (Exception e) {
             throw new DownstreamServiceException("alert-level-service unavailable");
         }
+    }
+
+    private static StaffingSchedule buildSchedule(Ward ward, int alertLevel) {
+        int doctorsRequired = calculateDoctorsRequired(ward, alertLevel);
+        List<String> onCallDoctors = new ArrayList<>();
+
+        String specialty = ward.department == null || ward.department.isBlank()
+                ? "General"
+                : ward.department;
+
+        for (int i = 1; i <= doctorsRequired; i++) {
+            onCallDoctors.add(specialty + " Doctor " + i);
+        }
+
+        return new StaffingSchedule(ward, alertLevel, doctorsRequired, onCallDoctors);
+    }
+
+    private static int calculateDoctorsRequired(Ward ward, int alertLevel) {
+        int doctors = 1;
+
+        if (alertLevel >= 3) {
+            doctors++;
+        }
+
+        if (alertLevel >= 6) {
+            doctors++;
+        }
+
+        if (ward.bedsAvailable != null && ward.bedsAvailable == 0) {
+            doctors++;
+        }
+
+        return doctors;
     }
 
     private static class WardNotFoundException extends RuntimeException {
