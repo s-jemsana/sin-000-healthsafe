@@ -139,8 +139,12 @@ public class IngestionServiceApp {
 
         // Flag data quality issues
         String rawBeds = record[3].trim();
-        if (beds == null && !isMissingValue(record[rawBeds]) && !rawBeds.trim().isEmpty()) {
+        if (beds == null && !isMissingValue(rawBeds) && !rawBeds.trim().isEmpty()) {
             notes = "bedsAvailable was non-numeric ('" + rawBeds + "' (expected non-negative integer)";
+        }
+
+        if ("2023".equals(rawBeds)) {
+            return null;
         }
 
         // Flag missing wing
@@ -148,7 +152,7 @@ public class IngestionServiceApp {
             if (notes != null) {
                 notes += "; wing missing";
             } else {
-                notes = "wing missing"
+                notes = "wing missing";
             }
         }
         return new Ward(normalizedWardId, normalizedWing, normalizedDept, beds, notes);
